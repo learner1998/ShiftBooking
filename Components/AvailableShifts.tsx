@@ -6,9 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  Alert,
 } from 'react-native';
-import React, { useEffect, useState} from 'react';
-import {get} from '../Api';
+import React, {useEffect, useState} from 'react';
+import {get, post} from '../Api';
 import CustomLoader from './Loader';
 const styles = StyleSheet.create({
   container: {
@@ -18,8 +19,8 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 18,
     color: '#4F6C92',
-    height:40,
-    paddingTop:8
+    height: 40,
+    paddingTop: 8,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -31,12 +32,13 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
     height: 50,
     alignItems: 'center',
     backgroundColor: '#F7F8FB',
     borderBottomWidth: 1, // Add border width
-    borderColor: '#CBD2E1'
+    borderColor: '#CBD2E1',
+    marginHorizontal:10
   },
   tab: {
     flex: 1,
@@ -62,16 +64,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent', // Set the background color to transparent
     borderWidth: 1, // Add border width
     borderColor: '#16A64D', // Set the border color
-
+  },
+  buttonCancel:{
+    padding: 8,
+    borderRadius: 20,
+    width: 100,
+    alignItems: 'center',
+    backgroundColor: 'transparent', // Set the background color to transparent
+    borderWidth: 1, // Add border width
+    borderColor: '#E2006A'
   },
   buttonText: {
     color: '#16A64D',
     fontSize: 14,
   },
-
+  buttonTextCancel: {
+    color: '#E2006A',
+    fontSize: 14,
+  },
+  
 });
 function AvailableShifts() {
-    const [loading,setLoading] =useState(false);
+  const [loading, setLoading] = useState(false);
   const [shifts, setShifts] = useState([]);
   const [dataTabs, setDataTabs] = useState({});
   useEffect(() => {
@@ -94,19 +108,38 @@ function AvailableShifts() {
         }
         setDataTabs(data);
         setShifts(response.data);
-        setLoading(false)
+        setLoading(false);
+        
       })
       .catch(error => {
-        // Handle any errors
         setLoading(false);
         console.error('Error fetching data:', error);
       });
   }, []);
-  return (
-    loading ? <CustomLoader loading={loading}/> :  <TabsWithHeader data={dataTabs} />
-  )
-  
+  return loading ? (
+    <CustomLoader loading={loading} />
+  ) : (
+    <TabsWithHeader data={dataTabs} />
+  );
 }
+const toggleBooking = (shift, index) => {
+    let payload = {
+      id: shift.id,
+      booked: true,
+      area: shift.area,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    };    
+    console.log(shift);
+    post(`/shifts/${shift.id}/book`,shift)
+      .then((response: any) => {
+      })
+      .catch(error => {
+        // Handle any errors
+        Alert('efnnfd')
+        console.error('Error fetching data:', error);
+      });
+  };
 
 const TabsWithHeader = ({data = {}}) => {
   const [activeTab, setActiveTab] = useState(
@@ -127,16 +160,18 @@ const TabsWithHeader = ({data = {}}) => {
     acc[startDate].push(rest);
     return acc;
   }, {});
-  const getTimeIn24HourFormat = (time) => {
+  const getTimeIn24HourFormat = time => {
     const date = new Date(time);
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
   };
-  const toggleBooking = () => {
 
-  }
+  // const getAvailableShifts = () =>{
 
+  // }
+
+  
   return (
     <View style={styles.container}>
       <View style={styles.tabContainer}>
@@ -152,24 +187,29 @@ const TabsWithHeader = ({data = {}}) => {
           </TouchableOpacity>
         ))}
       </View>
-      <ScrollView >
-      {Object.keys(groupedData).map((date, index) => (
-        <View key={index}>
-          <Text style={styles.text}>{date}</Text>
-          {groupedData[date].map((item, index) => (
-            <View style={styles.listContainer} key={index}>
-              <Text>
-                {getTimeIn24HourFormat(item.startTime)} - {getTimeIn24HourFormat(item.endTime)}
-              </Text>
-              <Text>{item.booked ? 'Booked' : ''}</Text>
-              <TouchableOpacity style={styles.button} onPress={toggleBooking}>
-                <Text style={styles.buttonText}>{item.booked ? 'Cancel' : 'Book'}</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      ))}
-  </ScrollView>
+      <ScrollView>
+        {Object.keys(groupedData).map((date, index) => (
+          <View key={index}>
+            <Text style={styles.text}>{date}</Text>
+            {groupedData[date].map((item, index) => (
+              <View style={styles.listContainer} key={index}>
+                <Text>
+                  {getTimeIn24HourFormat(item.startTime)} -{' '}
+                  {getTimeIn24HourFormat(item.endTime)}
+                </Text>
+                <Text>{item.booked ? 'Booked' : ''}</Text>
+                <TouchableOpacity
+                  style={!item.booked? styles.button:styles.buttonCancel}
+                  onPress={() => toggleBooking(item,index)}>
+                  <Text style={!item.booked? styles.buttonText:styles.buttonTextCancel}>
+                    {item.booked ? 'Cancel' : 'Book'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 };
