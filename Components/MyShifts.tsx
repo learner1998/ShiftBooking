@@ -1,6 +1,12 @@
-import {Text, StyleSheet, View, ScrollView} from 'react-native';
-import React, {Component, useEffect, useState} from 'react';
-import {get} from '../Api';
+import {
+  Text,
+  StyleSheet,
+  View,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {get, post} from '../Api';
 const styles = StyleSheet.create({
   shiftHeader: {
     backgroundColor: '#CBD2E1',
@@ -21,28 +27,120 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingTop: 22,
-  },
-  item: {
-    padding: 10,
-    fontSize: 18,
-    height: 44,
-    borderBottomWidth: 1,
-    borderBottomColor: '#cccccc',
+    paddingTop: 50,
   },
   text: {
     fontSize: 18,
+    color: '#4F6C92',
+    height: 40,
+    paddingTop: 8,
+  },
+
+  listContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 50,
+    alignItems: 'center',
+    backgroundColor: '#F7F8FB',
+    borderBottomWidth: 1, // Add border width
+    borderColor: '#CBD2E1',
+    marginHorizontal: 10,
+  },
+
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  buttonCancel: {
+    padding: 8,
+    borderRadius: 20,
+    width: 100,
+    alignItems: 'center',
+    backgroundColor: 'transparent', // Set the background color to transparent
+    borderWidth: 1, // Add border width
+    borderColor: '#E2006A',
+  },
+
+  buttonTextCancel: {
+    color: '#E2006A',
+    fontSize: 14,
   },
 });
 const MyShifts = () => {
   const [myShifts, setMyShifts] = useState([]);
+
+  useEffect(() => {
+    get('/shifts')
+      .then((response: any) => {
+        let data = [];
+        for (const item of response.data) {
+          item['startDate'] = new Date(item.startTime).toLocaleDateString(
+            'en-US',
+            {month: 'long', day: 'numeric'},
+          );
+        }
+        data = response.data.filter((item: any) => item.booked);
+        setMyShifts(data);
+      })
+      .catch(error => {
+        console.error('Error fetching data:', error);
+      });
+  }, []);
+  const toggleBooking = (shift, index: number) => {
+    let payload = {
+      id: shift.id,
+      booked: false,
+      area: shift.area,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    };
+    post(`/shifts/${shift.id}/cancel`, payload)
+      .then((response: any) => {})
+      .catch(error => {
+        // Handle any errors
+        console.error('Error fetching data:', error);
+      });
+  };
+
+  const groupedData = myShifts.reduce((acc, item) => {
+    const {startDate, ...rest} = item;
+    if (!acc[startDate]) {
+      acc[startDate] = [];
+    }
+    acc[startDate].push(rest);
+    return acc;
+  }, {});
+  const getTimeIn24HourFormat = time => {
+    const date = new Date(time);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   return (
     <View style={styles.container}>
       {myShifts.length ? (
         <ScrollView>
-          {myShifts.map((item: any, index) => (
-            <View key={index} style={styles.item}>
-              <Text style={styles.text}>{item.area}</Text>
+          {Object.keys(groupedData).map((date, index) => (
+            <View key={index}>
+              <Text style={styles.text}>{date}</Text>
+              {groupedData[date].map((item, index) => (
+                <View style={styles.listContainer} key={index}>
+                  <Text>
+                    {getTimeIn24HourFormat(item.startTime)} -
+                    {getTimeIn24HourFormat(item.endTime)}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.buttonCancel}
+                    onPress={() => toggleBooking(item, index)}>
+                    <Text style={styles.buttonTextCancel}>
+                      {item.booked ? 'Cancel' : 'Book'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           ))}
         </ScrollView>

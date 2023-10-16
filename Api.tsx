@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://127.0.0.1:8080'; // Replace this with your actual base URL
+const BASE_URL = 'https://63c64009dcdc478e15bdb586.mockapi.io/api/v1/'; // Replace this with your actual base URL
 
 const api = axios.create({
   baseURL: BASE_URL,

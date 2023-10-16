@@ -5,11 +5,9 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  FlatList,
-  Alert,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
-import {get, post} from '../Api';
+import {get, put} from '../Api';
 import CustomLoader from './Loader';
 const styles = StyleSheet.create({
   container: {
@@ -38,7 +36,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F8FB',
     borderBottomWidth: 1, // Add border width
     borderColor: '#CBD2E1',
-    marginHorizontal:10
+    marginHorizontal: 10,
   },
   tab: {
     flex: 1,
@@ -65,14 +63,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Add border width
     borderColor: '#16A64D', // Set the border color
   },
-  buttonCancel:{
+  buttonCancel: {
     padding: 8,
     borderRadius: 20,
     width: 100,
     alignItems: 'center',
     backgroundColor: 'transparent', // Set the background color to transparent
     borderWidth: 1, // Add border width
-    borderColor: '#E2006A'
+    borderColor: '#E2006A',
   },
   buttonText: {
     color: '#16A64D',
@@ -82,20 +80,25 @@ const styles = StyleSheet.create({
     color: '#E2006A',
     fontSize: 14,
   },
-  
 });
 function AvailableShifts() {
   const [loading, setLoading] = useState(false);
   const [shifts, setShifts] = useState([]);
   const [dataTabs, setDataTabs] = useState({});
   useEffect(() => {
+    getAvailableShifts();
+  }, []);
+  const handleDataTabsUpdate = (newData) => {
+    setDataTabs(newData);
+  };
+  const getAvailableShifts = () => {
     setLoading(true);
     get('/shifts')
       .then((response: any) => {
         let data = {};
         response.data.map(city => {
           data[city.area] = response.data.filter(
-            item => item.area == city.area,
+            item => item.area == city.area && (new Date(item.startTime).getDate() >= new Date().getDate()),
           );
         });
         for (const key of Object.keys(data)) {
@@ -109,39 +112,60 @@ function AvailableShifts() {
         setDataTabs(data);
         setShifts(response.data);
         setLoading(false);
-        
       })
       .catch(error => {
         setLoading(false);
         console.error('Error fetching data:', error);
       });
-  }, []);
+  };
   return loading ? (
     <CustomLoader loading={loading} />
   ) : (
-    <TabsWithHeader data={dataTabs} />
+    <TabsWithHeader data={dataTabs} handleDataTabsUpdate={handleDataTabsUpdate} />
   );
 }
-const toggleBooking = (shift, index) => {
+
+const TabsWithHeader = ({data = {}, handleDataTabsUpdate }) => {
+  const [loadingMap, setLoadingMap] = useState({});
+
+  const updatedToggleBooking = (shift, index) => {
+    setLoadingMap((prevLoadingMap) => ({
+      ...prevLoadingMap,
+      [shift.id]: true,
+    }));
     let payload = {
       id: shift.id,
-      booked: true,
+      booked: !shift.booked,
       area: shift.area,
       startTime: shift.startTime,
       endTime: shift.endTime,
-    };    
-    console.log(shift);
-    post(`/shifts/${shift.id}/book`,shift)
+    };
+    put(`/shifts/${shift.id}`, payload)
       .then((response: any) => {
+        const newData = { ...data };
+        const activeDataCopy = [...data[activeTab]];
+        activeDataCopy.forEach(element => {
+          if(element.id === shift.id){
+            element.booked = !shift.booked;
+          }
+        })
+        newData[activeTab] = activeDataCopy;
+        handleDataTabsUpdate(newData);
+        setLoadingMap((prevLoadingMap) => ({
+          ...prevLoadingMap,
+          [shift.id]: false,
+        }));
       })
       .catch(error => {
-        // Handle any errors
-        Alert('efnnfd')
         console.error('Error fetching data:', error);
       });
   };
-
-const TabsWithHeader = ({data = {}}) => {
+  function isWithinRange(startTime, endTime) {
+    const current = new Date();
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return ( current >= start && current <= end ||  current >= start);
+  }
   const [activeTab, setActiveTab] = useState(
     Object.keys(data).length > 0 ? Object.keys(data)[0] : '',
   );
@@ -160,6 +184,7 @@ const TabsWithHeader = ({data = {}}) => {
     acc[startDate].push(rest);
     return acc;
   }, {});
+  
   const getTimeIn24HourFormat = time => {
     const date = new Date(time);
     const hours = String(date.getHours()).padStart(2, '0');
@@ -167,11 +192,6 @@ const TabsWithHeader = ({data = {}}) => {
     return `${hours}:${minutes}`;
   };
 
-  // const getAvailableShifts = () =>{
-
-  // }
-
-  
   return (
     <View style={styles.container}>
       <View style={styles.tabContainer}>
@@ -181,7 +201,10 @@ const TabsWithHeader = ({data = {}}) => {
             onPress={() => onTabPress(item)}
             style={[styles.tab]}>
             <Text
-              style={[styles.tabText, activeTab === item && styles.activeTab]}>
+              style={[
+                styles.tabText,
+                activeTab === item && styles.activeTab,
+              ]}>
               {item} ({data[item]?.length})
             </Text>
           </TouchableOpacity>
@@ -190,7 +213,10 @@ const TabsWithHeader = ({data = {}}) => {
       <ScrollView>
         {Object.keys(groupedData).map((date, index) => (
           <View key={index}>
-            <Text style={styles.text}>{date}</Text>
+            <Text style={styles.text}>{date === new Date().toLocaleDateString(
+            'en-US',
+            {month: 'long', day: 'numeric'},
+          ) ? 'Today' : date}</Text>
             {groupedData[date].map((item, index) => (
               <View style={styles.listContainer} key={index}>
                 <Text>
@@ -199,11 +225,26 @@ const TabsWithHeader = ({data = {}}) => {
                 </Text>
                 <Text>{item.booked ? 'Booked' : ''}</Text>
                 <TouchableOpacity
-                  style={!item.booked? styles.button:styles.buttonCancel}
-                  onPress={() => toggleBooking(item,index)}>
-                  <Text style={!item.booked? styles.buttonText:styles.buttonTextCancel}>
-                    {item.booked ? 'Cancel' : 'Book'}
-                  </Text>
+                  disabled={isWithinRange(item.startTime, item.endTime)}
+                  style={!item.booked ? styles.button : styles.buttonCancel}
+                  onPress={() => updatedToggleBooking(item, index)}>
+                 {loadingMap[item.id] ? (
+                    <CustomLoader loading={loadingMap[item.id]} />
+                  //   <Image
+                  //   style={{height:'10px'}}
+                  //   source={require('../assets/spinner_green.svg')}
+                  // />
+                  ) : (
+                    <Text
+                      style={
+                        !item.booked
+                          ? styles.buttonText
+                          : styles.buttonTextCancel
+                      }
+                    >
+                      {item.booked ? 'Cancel' : 'Book'}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             ))}
