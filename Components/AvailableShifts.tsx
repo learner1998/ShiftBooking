@@ -5,10 +5,12 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
 import {get, put} from '../Api';
 import CustomLoader from './Loader';
+import { useFocusEffect } from '@react-navigation/native';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -19,6 +21,7 @@ const styles = StyleSheet.create({
     color: '#4F6C92',
     height: 40,
     paddingTop: 8,
+    marginLeft:10,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -72,6 +75,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Add border width
     borderColor: '#E2006A',
   },
+  buttonCancelDisabled: {
+    padding: 8,
+    borderRadius: 20,
+    width: 100,
+    alignItems: 'center',
+    backgroundColor: 'transparent', // Set the background color to transparent
+    borderWidth: 1, // Add border width
+    borderColor: '#CBD2E1',
+  },
   buttonText: {
     color: '#16A64D',
     fontSize: 14,
@@ -80,14 +92,22 @@ const styles = StyleSheet.create({
     color: '#E2006A',
     fontSize: 14,
   },
+  buttonTextCancelDisabled:{
+    color: '#CBD2E1',
+    fontSize: 14,
+  }
 });
 function AvailableShifts() {
   const [loading, setLoading] = useState(false);
   const [shifts, setShifts] = useState([]);
   const [dataTabs, setDataTabs] = useState({});
-  useEffect(() => {
-    getAvailableShifts();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      getAvailableShifts();
+      // Your code here
+    }, []),
+  );
+
   const handleDataTabsUpdate = (newData) => {
     setDataTabs(newData);
   };
@@ -223,10 +243,16 @@ const TabsWithHeader = ({data = {}, handleDataTabsUpdate }) => {
                   {getTimeIn24HourFormat(item.startTime)} -{' '}
                   {getTimeIn24HourFormat(item.endTime)}
                 </Text>
-                <Text>{item.booked ? 'Booked' : ''}</Text>
+                <Text style={!(index > 0 && groupedData[date][index-1].booked &&  new Date(item.startTime).getTime() < new Date(groupedData[date][index-1].endTime).getTime()) ? {'color':'#000'} : {'color':'#E2006A'}}>
+                 { 
+                !(index > 0 && groupedData[date][index-1].booked &&  new Date(item.startTime).getTime() < new Date(groupedData[date][index-1].endTime).getTime()) ?
+                  (item.booked ? 'Booked' : '') : 'Overlapping'
+                  }
+                  
+                  </Text>
                 <TouchableOpacity
-                  disabled={isWithinRange(item.startTime, item.endTime)}
-                  style={!item.booked ? styles.button : styles.buttonCancel}
+                  disabled={isWithinRange(item.startTime, item.endTime) || (index > 0 && groupedData[date][index-1].booked &&  new Date(item.startTime).getTime() < new Date(groupedData[date][index-1].endTime).getTime()) }
+                  style={!(index > 0 && groupedData[date][index-1].booked &&  new Date(item.startTime).getTime() < new Date(groupedData[date][index-1].endTime).getTime()) ?(!isWithinRange(item.startTime, item.endTime) ? (!item.booked ? styles.button : styles.buttonCancel):styles.buttonCancelDisabled) : styles.buttonCancelDisabled}    
                   onPress={() => updatedToggleBooking(item, index)}>
                  {loadingMap[item.id] ? (
                     <CustomLoader loading={loadingMap[item.id]} />
@@ -236,13 +262,9 @@ const TabsWithHeader = ({data = {}, handleDataTabsUpdate }) => {
                   // />
                   ) : (
                     <Text
-                      style={
-                        !item.booked
-                          ? styles.buttonText
-                          : styles.buttonTextCancel
-                      }
+                      style={ !(index > 0 && groupedData[date][index-1].booked &&  new Date(item.startTime).getTime() < new Date(groupedData[date][index-1].endTime).getTime()) ?(!isWithinRange(item.startTime, item.endTime) ? (!item.booked ? styles.buttonText : styles.buttonTextCancel):styles.buttonTextCancelDisabled) : styles.buttonTextCancelDisabled} 
                     >
-                      {item.booked ? 'Cancel' : 'Book'}
+                    {item.booked ? 'Cancel' : 'Book'}
                     </Text>
                   )}
                 </TouchableOpacity>

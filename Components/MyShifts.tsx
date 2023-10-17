@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
-import {get, post} from '../Api';
+import {get, post, put} from '../Api';
+import {useFocusEffect} from '@react-navigation/native';
 const styles = StyleSheet.create({
   shiftHeader: {
     backgroundColor: '#CBD2E1',
@@ -62,16 +63,38 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Add border width
     borderColor: '#E2006A',
   },
-
+  buttonCancelDisabled: {
+    padding: 8,
+    borderRadius: 20,
+    width: 100,
+    alignItems: 'center',
+    backgroundColor: 'transparent', // Set the background color to transparent
+    borderWidth: 1, // Add border width
+    borderColor: '#CBD2E1',
+  },
   buttonTextCancel: {
     color: '#E2006A',
+    fontSize: 14,
+  },
+  buttonTextCancelDisabled: {
+    color: '#CBD2E1',
     fontSize: 14,
   },
 });
 const MyShifts = () => {
   const [myShifts, setMyShifts] = useState([]);
+  const [totalShiftTime, setTotalShiftTime] = useState(0);
+  // useEffect(() => {
+  // }, [myShifts.length]);
 
-  useEffect(() => {
+  useFocusEffect(
+    React.useCallback(() => {
+      getShifts();
+      // Your code here
+    }, [myShifts.length]),
+  );
+
+  function getShifts() {
     get('/shifts')
       .then((response: any) => {
         let data = [];
@@ -81,13 +104,23 @@ const MyShifts = () => {
             {month: 'long', day: 'numeric'},
           );
         }
-        data = response.data.filter((item: any) => item.booked);
+        data = response.data.filter(
+          (item: any) => item.booked && item.endTime > new Date().getTime(),
+        );
+        let timeShift = 0;
+        // data.forEach(element => {
+        //   timeShift +=
+        //     parseInt(getTimeIn24HourFormat(element.startTime)) -
+        //     parseInt(getTimeIn24HourFormat(element.endTime));
+        // });
+        console.log(timeShift);
         setMyShifts(data);
       })
       .catch(error => {
         console.error('Error fetching data:', error);
       });
-  }, []);
+  }
+
   const toggleBooking = (shift, index: number) => {
     let payload = {
       id: shift.id,
@@ -96,8 +129,10 @@ const MyShifts = () => {
       startTime: shift.startTime,
       endTime: shift.endTime,
     };
-    post(`/shifts/${shift.id}/cancel`, payload)
-      .then((response: any) => {})
+    put(`/shifts/${shift.id}`, payload)
+      .then((response: any) => {
+        getShifts();
+      })
       .catch(error => {
         // Handle any errors
         console.error('Error fetching data:', error);
@@ -118,7 +153,12 @@ const MyShifts = () => {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
   };
-
+  function isWithinRange(startTime, endTime) {
+    const current = new Date();
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return (current >= start && current <= end) || current >= start;
+  }
   return (
     <View style={styles.container}>
       {myShifts.length ? (
@@ -133,9 +173,23 @@ const MyShifts = () => {
                     {getTimeIn24HourFormat(item.endTime)}
                   </Text>
                   <TouchableOpacity
-                    style={styles.buttonCancel}
+                    style={
+                      !isWithinRange(item.startTime, item.endTime)
+                        ? !item.booked
+                          ? styles.button
+                          : styles.buttonCancel
+                        : styles.buttonCancelDisabled
+                    }
+                    disabled={isWithinRange(item.startTime, item.endTime)}
                     onPress={() => toggleBooking(item, index)}>
-                    <Text style={styles.buttonTextCancel}>
+                    <Text
+                      style={
+                        !isWithinRange(item.startTime, item.endTime)
+                          ? !item.booked
+                            ? styles.buttonText
+                            : styles.buttonTextCancel
+                          : styles.buttonTextCancelDisabled
+                      }>
                       {item.booked ? 'Cancel' : 'Book'}
                     </Text>
                   </TouchableOpacity>
